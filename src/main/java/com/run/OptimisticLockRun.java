@@ -18,7 +18,7 @@ public class OptimisticLockRun {
         // 초기 재고: 100개
         pl.initDataOnce(emf);
 
-        int threadCount = 100;
+        int threadCount = 1_000_000;
         ExecutorService executor = Executors.newFixedThreadPool(20);
         CountDownLatch latch = new CountDownLatch(threadCount);
 
@@ -31,7 +31,7 @@ public class OptimisticLockRun {
             executor.submit(() -> {
                 try {
                     // 최대 10회 재시도
-                    boolean success = pl.executeWithRetry(emf, 1L, 10);
+                    boolean success = pl.executeWithRetry(emf, 1L, 2);
                     if (success) {
                         successCount.incrementAndGet();
                     } else {

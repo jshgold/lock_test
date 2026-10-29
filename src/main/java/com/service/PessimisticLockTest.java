@@ -63,7 +63,7 @@ public class PessimisticLockTest {
         if (initialized.compareAndSet(false, true)) {
 //            initDataDead(emf);
 //            initData(emf);
-            initData(emf,100);
+            initData(emf,1_000_000);
         }
     }
 
@@ -151,6 +151,7 @@ public class PessimisticLockTest {
             } catch (RollbackException e) {
                 // 커밋 단계에서 OptimisticLockException이 감지되면 RollbackException으로 감싸져서 던져짐
                 if (e.getCause() instanceof OptimisticLockException) {
+                    e.printStackTrace();
                     retryCount++;
                     try {
                         // 스레드들이 동시에 다시 덤벼서 재충돌나는 것을 방지하기 위해 지수 백오프/랜덤 슬립 적용

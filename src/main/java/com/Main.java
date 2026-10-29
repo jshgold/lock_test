@@ -2,6 +2,7 @@ package com;
 
 import com.run.AtomicQueryRun;
 import com.run.OptimisticLockRun;
+import com.run.PessimisticLockRun;
 
 
 public class Main {
@@ -14,10 +15,10 @@ public class Main {
 //        DeadLockRun.run();
 
         //원자성 쿼리
-//        AtomicQueryRun.run();
+        AtomicQueryRun.run();
 
         //낙관적 락
-        OptimisticLockRun.run();
+//        OptimisticLockRun.run();
     }
 
 }
