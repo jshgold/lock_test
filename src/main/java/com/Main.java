@@ -17,8 +17,8 @@ public class Main {
 
         pl.initDataOnce(emf);
 
-        int threadCount = 100;
-        ExecutorService executor = Executors.newFixedThreadPool(32);
+        int threadCount = 1_000_000;
+        ExecutorService executor = Executors.newFixedThreadPool(20);
         CountDownLatch latch = new CountDownLatch(threadCount);
 
         System.out.println("PostgreSQL 비관적 락 테스트 시작...");

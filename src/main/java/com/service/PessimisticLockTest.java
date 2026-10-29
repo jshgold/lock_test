@@ -24,7 +24,7 @@ public class PessimisticLockTest {
 
     }
 
-    public static synchronized PessimisticLockTest getInstance() {
+    public static PessimisticLockTest getInstance() {
         if (instance == null) {
             synchronized(PessimisticLockTest.class) {
                 if (instance == null) {
@@ -38,7 +38,7 @@ public class PessimisticLockTest {
      */
 
 
-    public static void executePessimisticLock(EntityManagerFactory emf) {
+    public void executePessimisticLock(EntityManagerFactory emf) {
         EntityManager em = emf.createEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
@@ -51,27 +51,31 @@ public class PessimisticLockTest {
             tx.commit(); // 커밋 시점에 락 해제
         } catch (Exception e) {
             tx.rollback();
+            e.printStackTrace();
         } finally {
             em.close();
         }
     }
 
-    public static void initDataOnce(EntityManagerFactory emf) {
+    public void initDataOnce(EntityManagerFactory emf) {
         // false일 때만 true로 바꾸고 통과 (동시에 여러 스레드가 와도 딱 1명만 성공)
         if (initialized.compareAndSet(false, true)) {
             initData(emf);
         }
     }
 
-    private static void initData(EntityManagerFactory emf) {
+    private void initData(EntityManagerFactory emf) {
         EntityManager em = emf.createEntityManager();
-        em.getTransaction().begin();
-        em.persist(new Item(1L, 100));
-        em.getTransaction().commit();
-        em.close();
+        try {
+            em.getTransaction().begin();
+            em.persist(new Item(1L, 1_000_000));
+            em.getTransaction().commit();
+        } finally {
+            em.close();
+        }
     }
 
-    public static void verifyResult(EntityManagerFactory emf) {
+    public void verifyResult(EntityManagerFactory emf) {
         EntityManager em = emf.createEntityManager();
         Item item = em.find(Item.class, 1L);
         System.out.println("최종 재고: " + item.getStock());
