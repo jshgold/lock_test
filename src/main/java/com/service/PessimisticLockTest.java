@@ -3,36 +3,42 @@ package com.service;
 import com.entity.Item;
 import jakarta.persistence.*;
 import java.util.concurrent.*;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PessimisticLockTest {
-    public static void main(String[] args) throws InterruptedException {
-        EntityManagerFactory emf = Persistence.createEntityManagerFactory("lockTestUnit");
+    private static final AtomicBoolean initialized = new AtomicBoolean(false);
+    private PessimisticLockTest() {
 
-        initData(emf);
-
-        int threadCount = 100;
-        ExecutorService executor = Executors.newFixedThreadPool(32);
-        CountDownLatch latch = new CountDownLatch(threadCount);
-
-        System.out.println("PostgreSQL 비관적 락 테스트 시작...");
-        for (int i = 0; i < threadCount; i++) {
-            executor.submit(() -> {
-                try {
-                    executePessimisticLock(emf);
-                } finally {
-                    latch.countDown();
-                }
-            });
-        }
-
-        latch.await();
-        executor.shutdown();
-
-        verifyResult(emf);
-        emf.close();
     }
 
-    private static void executePessimisticLock(EntityManagerFactory emf) {
+    private static class Holder {
+        private static final PessimisticLockTest instance = new PessimisticLockTest();
+    }
+
+    public static PessimisticLockTest getInstance() {
+        return Holder.instance;
+    }
+    /* Double Check Null 방식
+    private static volatile PessimisticLockTest instance;
+    private PessimisticLockTest() {
+
+    }
+
+    public static synchronized PessimisticLockTest getInstance() {
+        if (instance == null) {
+            synchronized(PessimisticLockTest.class) {
+                if (instance == null) {
+                    instance = new PessimisticLockTest();
+                }
+            }
+        }
+        return instance;
+    }
+
+     */
+
+
+    public static void executePessimisticLock(EntityManagerFactory emf) {
         EntityManager em = emf.createEntityManager();
         EntityTransaction tx = em.getTransaction();
         try {
@@ -50,6 +56,13 @@ public class PessimisticLockTest {
         }
     }
 
+    public static void initDataOnce(EntityManagerFactory emf) {
+        // false일 때만 true로 바꾸고 통과 (동시에 여러 스레드가 와도 딱 1명만 성공)
+        if (initialized.compareAndSet(false, true)) {
+            initData(emf);
+        }
+    }
+
     private static void initData(EntityManagerFactory emf) {
         EntityManager em = emf.createEntityManager();
         em.getTransaction().begin();
@@ -58,7 +71,7 @@ public class PessimisticLockTest {
         em.close();
     }
 
-    private static void verifyResult(EntityManagerFactory emf) {
+    public static void verifyResult(EntityManagerFactory emf) {
         EntityManager em = emf.createEntityManager();
         Item item = em.find(Item.class, 1L);
         System.out.println("최종 재고: " + item.getStock());

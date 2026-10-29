@@ -1,17 +1,41 @@
 package com;
 
-//TIP To <b>Run</b> code, press <shortcut actionId="Run"/> or
-// click the <icon src="AllIcons.Actions.Execute"/> icon in the gutter.
-public class Main {
-    public static void main(String[] args) {
-        //TIP Press <shortcut actionId="ShowIntentionActions"/> with your caret at the highlighted text
-        // to see how IntelliJ IDEA suggests fixing it.
-        System.out.printf("Hello and welcome!");
+import com.service.PessimisticLockTest;
+import jakarta.persistence.EntityManagerFactory;
+import jakarta.persistence.Persistence;
 
-        for (int i = 1; i <= 5; i++) {
-            //TIP Press <shortcut actionId="Debug"/> to start debugging your code. We have set one <icon src="AllIcons.Debugger.Db_set_breakpoint"/> breakpoint
-            // for you, but you can always add more by pressing <shortcut actionId="ToggleLineBreakpoint"/>.
-            System.out.println("i = " + i);
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+
+
+public class Main {
+    private static final PessimisticLockTest pl = PessimisticLockTest.getInstance();
+
+    public static void main(String[] args) throws InterruptedException{
+        EntityManagerFactory emf = Persistence.createEntityManagerFactory("lockTestUnit");
+
+        pl.initDataOnce(emf);
+
+        int threadCount = 100;
+        ExecutorService executor = Executors.newFixedThreadPool(32);
+        CountDownLatch latch = new CountDownLatch(threadCount);
+
+        System.out.println("PostgreSQL 비관적 락 테스트 시작...");
+        for (int i = 0; i < threadCount; i++) {
+            executor.submit(() -> {
+                try {
+                    pl.executePessimisticLock(emf);
+                } finally {
+                    latch.countDown();
+                }
+            });
         }
+
+        latch.await();
+        executor.shutdown();
+
+        pl.verifyResult(emf);
+        emf.close();
     }
 }
