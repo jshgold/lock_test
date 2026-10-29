@@ -6,7 +6,7 @@ import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 public class PessimisticLockTest {
-    private static final AtomicBoolean initialized = new AtomicBoolean(false);
+    private static AtomicBoolean initialized = new AtomicBoolean(false);
     private PessimisticLockTest() {
 
     }
@@ -58,10 +58,22 @@ public class PessimisticLockTest {
     }
 
     public void initDataOnce(EntityManagerFactory emf) {
+
         // false일 때만 true로 바꾸고 통과 (동시에 여러 스레드가 와도 딱 1명만 성공)
         if (initialized.compareAndSet(false, true)) {
-            initData(emf);
+//            initDataDead(emf);
+//            initData(emf);
+            initData(emf,1_000_000);
         }
+    }
+
+    private void initDataDead(EntityManagerFactory emf) {
+        EntityManager em = emf.createEntityManager();
+        em.getTransaction().begin();
+        em.persist(new Item(1L, 100)); // 첫 번째 자원
+        em.persist(new Item(2L, 100)); // 두 번째 자원
+        em.getTransaction().commit();
+        em.close();
     }
 
     private void initData(EntityManagerFactory emf) {
@@ -75,10 +87,47 @@ public class PessimisticLockTest {
         }
     }
 
+    private void initData(EntityManagerFactory emf, int stock) {
+        EntityManager em = emf.createEntityManager();
+        em.getTransaction().begin();
+        em.persist(new Item(1L, stock));
+        em.getTransaction().commit();
+        em.close();
+    }
+
     public void verifyResult(EntityManagerFactory emf) {
         EntityManager em = emf.createEntityManager();
         Item item = em.find(Item.class, 1L);
         System.out.println("최종 재고: " + item.getStock());
         em.close();
     }
+
+    public boolean decreaseStockAtomic(EntityManagerFactory emf, Long itemId, int quantity) {
+        EntityManager em = emf.createEntityManager();
+        EntityTransaction tx = em.getTransaction();
+        try {
+            tx.begin();
+
+            // JPQL 벌크 연산으로 단일 UPDATE 쿼리 직접 실행
+            int updatedRows = em.createQuery(
+                            "UPDATE Item i SET i.stock = i.stock - :quantity " +
+                                    "WHERE i.id = :id AND i.stock >= :quantity"
+                    )
+                    .setParameter("quantity", quantity)
+                    .setParameter("id", itemId)
+                    .executeUpdate();
+
+            tx.commit();
+
+            // 영향받은 행(Row) 수가 1이면 차감 성공, 0이면 조건(stock >= quantity) 미충족으로 실패
+            return updatedRows > 0;
+        } catch (Exception e) {
+            tx.rollback();
+            return false;
+        } finally {
+            em.close();
+        }
+    }
+
+
 }
