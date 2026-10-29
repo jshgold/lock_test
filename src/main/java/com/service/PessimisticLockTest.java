@@ -63,7 +63,7 @@ public class PessimisticLockTest {
         if (initialized.compareAndSet(false, true)) {
 //            initDataDead(emf);
 //            initData(emf);
-            initData(emf,1_000_000);
+            initData(emf,100);
         }
     }
 
@@ -99,6 +99,7 @@ public class PessimisticLockTest {
         EntityManager em = emf.createEntityManager();
         Item item = em.find(Item.class, 1L);
         System.out.println("최종 재고: " + item.getStock());
+        System.out.println("최종 엔티티 버전: " + item.getVersion());
         em.close();
     }
 
@@ -127,6 +128,46 @@ public class PessimisticLockTest {
         } finally {
             em.close();
         }
+    }
+
+    // 낙관적 락 충돌 시 재시도 로직
+    public boolean executeWithRetry(EntityManagerFactory emf, Long itemId, int maxRetries) {
+        int retryCount = 0;
+        while (retryCount < maxRetries) {
+            EntityManager em = emf.createEntityManager();
+            EntityTransaction tx = em.getTransaction();
+            try {
+                tx.begin();
+
+                // 락 모드 없이 일반 조회 (버전 정보 함께 로드)
+                // 필요에 따라 LockModeType.OPTIMISTIC 명시 가능
+                Item item = em.find(Item.class, itemId);
+                item.decreaseStock();
+
+                // 커밋 시점에 Hibernate가 아래와 같은 쿼리를 실행:
+                // UPDATE item SET stock = ?, version = version + 1 WHERE id = ? AND version = ?
+                tx.commit();
+                return true; // 성공
+            } catch (RollbackException e) {
+                // 커밋 단계에서 OptimisticLockException이 감지되면 RollbackException으로 감싸져서 던져짐
+                if (e.getCause() instanceof OptimisticLockException) {
+                    retryCount++;
+                    try {
+                        // 스레드들이 동시에 다시 덤벼서 재충돌나는 것을 방지하기 위해 지수 백오프/랜덤 슬립 적용
+                        Thread.sleep((long) (Math.random() * 50));
+                    } catch (InterruptedException ignored) {}
+                } else {
+                    tx.rollback();
+                    return false;
+                }
+            } catch (Exception e) {
+                tx.rollback();
+                return false;
+            } finally {
+                em.close();
+            }
+        }
+        return false; // 최대 재시도 횟수 초과
     }
 
 
