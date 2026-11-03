@@ -10,8 +10,8 @@ public class Item {
     private Long id;
     private int stock;
 
-    @Version
-    private Long version; // 낙관적 락을 위한 버전 관리 컬럼
+//    @Version
+//    private Long version; // 낙관적 락을 위한 버전 관리 컬럼
 
     protected Item() {}
 
@@ -28,5 +28,5 @@ public class Item {
     }
 
     public int getStock() { return stock; }
-    public Long getVersion() { return version; }
+//    public Long getVersion() { return version; }
 }

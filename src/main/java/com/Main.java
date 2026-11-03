@@ -3,6 +3,7 @@ package com;
 import com.run.AtomicQueryRun;
 import com.run.OptimisticLockRun;
 import com.run.PessimisticLockRun;
+import com.run.RedissionLockRun;
 
 
 public class Main {
@@ -18,7 +19,10 @@ public class Main {
 //        AtomicQueryRun.run();
 
         //낙관적 락
-        OptimisticLockRun.run();
+//        OptimisticLockRun.run();
+
+        //분산 락
+        RedissionLockRun.run();
         long endTime = System.currentTimeMillis();
         System.out.printf("실행시간 : %d ms",endTime - startTime);
     }

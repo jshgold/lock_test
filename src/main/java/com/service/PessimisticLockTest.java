@@ -2,6 +2,9 @@ package com.service;
 
 import com.entity.Item;
 import jakarta.persistence.*;
+import org.redisson.api.RLock;
+import org.redisson.api.RedissonClient;
+
 import java.util.concurrent.*;
 import java.util.concurrent.atomic.AtomicBoolean;
 
@@ -99,7 +102,7 @@ public class PessimisticLockTest {
         EntityManager em = emf.createEntityManager();
         Item item = em.find(Item.class, 1L);
         System.out.println("최종 재고: " + item.getStock());
-        System.out.println("최종 엔티티 버전: " + item.getVersion());
+//        System.out.println("최종 엔티티 버전: " + item.getVersion());
         em.close();
     }
 
@@ -171,5 +174,52 @@ public class PessimisticLockTest {
         return false; // 최대 재시도 횟수 초과
     }
 
+    public boolean decreaseStockWithDistributedLock(RedissonClient redisson, EntityManagerFactory emf, Long itemId) {
+        // 2. 락 객체 가져오기 (Redis의 특정 키를 락으로 사용)
+        String lockKey = "lock:item:" + itemId;
+        RLock lock = redisson.getLock(lockKey);
 
+        try {
+            // 3. 락 획득 시도
+            // waitTime: 10초 (락을 얻기 위해 최대 10초간 대기)
+            // leaseTime: -1 (락을 쥔 상태로 로직이 길어지면 Watchdog이 락 만료 시간을 자동 연장해줌)
+            boolean isLocked = lock.tryLock(10, -1, TimeUnit.SECONDS);
+
+            if (!isLocked) {
+                System.out.println("락 획득 실패 (대기 시간 초과)");
+                return false;
+            }
+
+            // --- [임계 영역(Critical Section) 시작] ---
+            // 락을 획득한 스레드만 DB 트랜잭션을 시작하여 재고를 차감합니다.
+            EntityManager em = emf.createEntityManager();
+            EntityTransaction tx = em.getTransaction();
+            try {
+                tx.begin();
+
+                // 일반 SELECT (DB 락 없음)
+                Item item = em.find(Item.class, itemId);
+                item.decreaseStock();
+
+                tx.commit();
+                return true;
+            } catch (Exception e) {
+                tx.rollback();
+                return false;
+            } finally {
+                em.close();
+            }
+            // --- [임계 영역 끝] ---
+
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            return false;
+        } finally {
+            // 4. 락 해제
+            // 현재 락이 잠겨 있고, 그 락을 쥔 스레드가 나 자신일 때만 해제
+            if (lock.isLocked() && lock.isHeldByCurrentThread()) {
+                lock.unlock();
+            }
+        }
+    }
 }
