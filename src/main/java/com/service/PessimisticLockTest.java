@@ -63,7 +63,7 @@ public class PessimisticLockTest {
         if (initialized.compareAndSet(false, true)) {
 //            initDataDead(emf);
 //            initData(emf);
-            initData(emf,1_000_000);
+            initData(emf,10_000);
         }
     }
 
@@ -80,7 +80,7 @@ public class PessimisticLockTest {
         EntityManager em = emf.createEntityManager();
         try {
             em.getTransaction().begin();
-            em.persist(new Item(1L, 1_000_000));
+            em.persist(new Item(1L, 10_000));
             em.getTransaction().commit();
         } finally {
             em.close();

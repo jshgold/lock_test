@@ -18,7 +18,7 @@ public class AtomicQueryRun {
         // 초기 재고: 10개 설정
         pl.initDataOnce(emf);
 
-        int threadCount = 1_000_000; // 100명이 동시 차감 시도
+        int threadCount = 10_000; // 100명이 동시 차감 시도
         ExecutorService executor = Executors.newFixedThreadPool(20);
         CountDownLatch latch = new CountDownLatch(threadCount);
 

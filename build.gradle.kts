@@ -16,6 +16,9 @@ dependencies {
     // JPA 구현체 (Hibernate)
     implementation("org.hibernate.orm:hibernate-core:6.4.4.Final")
     implementation("org.postgresql:postgresql:42.7.4")
+
+    // Redission
+    implementation("org.redisson:redisson:3.27.2")
 }
 
 tasks.test {
